@@ -1,0 +1,27 @@
+{
+    "base_url": "https://api.erse.pt/v2",
+    "auth": "Bearer token (provided via configuration)",
+
+    "endpoints": {
+        "POST /contracts": {
+            "request_body": {
+                "nif": "PT123456789",
+                "cups": "PT0002000012345678AB",
+                "supply_address": {
+                    "street": "Rua da Liberdade 100",
+                    "city": "Lisboa",
+                    "postal_code": "1250-096"
+                },
+                "tariff_code": "ERSE_REGULATED_01",
+                "start_date": "2026-03-01",
+                "estimated_annual_kwh": 3500
+            },
+            "responses": {
+                "201": { "erse_id": "ERSE-2026-00001", "status": "registered" },
+                "400": { "error": "validation_error", "details": ["..."] },
+                "409": { "error": "duplicate_contract", "existing_id": "ERSE-2025-09876" },
+                "500": "Internal Server Error"
+            }
+        }
+    }
+}

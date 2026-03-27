@@ -1,0 +1,32 @@
+{
+    "name": "factor-energia/technical-assessment",
+    "description": "Prueba técnica FactorEnergia 2026 — Yii2",
+    "type": "project",
+    "license": "BSD-3-Clause",
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=8.0",
+        "yiisoft/yii2": "~2.0.49",
+        "yiisoft/yii2-httpclient": "~2.0.15"
+    },
+    "require-dev": {
+        "yiisoft/yii2-debug": "~2.1.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "yiisoft/yii2-composer": true
+        },
+        "process-timeout": 1800
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "app\\": ""
+        }
+    }
+}

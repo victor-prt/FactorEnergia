@@ -1,0 +1,8 @@
+/vendor
+/runtime/*
+!/runtime/.gitkeep
+/web/assets/*
+!/web/assets/.gitkeep
+composer.lock
+.idea
+.env
