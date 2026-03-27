@@ -2,6 +2,7 @@
 
 namespace app\services;
 
+use app\components\erse\ErseSenderFactory;
 use app\models\Contract;
 use app\models\ErseContractSync;
 use Yii;
@@ -9,7 +10,6 @@ use yii\base\Component;
 use yii\db\Connection;
 use yii\di\Instance;
 use yii\helpers\Json;
-use yii\httpclient\Client;
 /**
  * Sincronización de contratos con la API ERSE (Parte 3.2).
  */
@@ -17,6 +17,8 @@ class ErseSyncService extends Component
 {
     /** @var Connection|array|string */
     public $db = 'db';
+    /** @var ErseSenderFactory|array|string */
+    public $senderFactory = 'erseSenderFactory';
 
     public function init(): void
     {
@@ -25,6 +27,11 @@ class ErseSyncService extends Component
             $this->db = Yii::$app->db;
         } else {
             $this->db = Instance::ensure($this->db, Connection::class);
+        }
+        if ($this->senderFactory === 'erseSenderFactory') {
+            $this->senderFactory = Yii::$app->erseSenderFactory;
+        } else {
+            $this->senderFactory = Instance::ensure($this->senderFactory, ErseSenderFactory::class);
         }
     }
 
@@ -40,7 +47,6 @@ class ErseSyncService extends Component
                 'contract_id' => $contract->id,
                 'sync_status' => ErseContractSync::STATUS_SUCCESS,
             ])
-            ->andWhere(['not', ['erse_id' => null]])
             ->orderBy(['id' => SORT_DESC])
             ->one();
 
@@ -49,7 +55,7 @@ class ErseSyncService extends Component
                 'httpStatus' => 409,
                 'body' => [
                     'error' => 'already_synced',
-                    'erse_id' => $prior->erse_id,
+                    'erse_id' => $prior->erse_id ?: ('ERSE-LOCAL-' . $contract->id),
                     'message' => 'El contrato ya fue sincronizado correctamente con ERSE.',
                 ],
             ];
@@ -70,82 +76,30 @@ class ErseSyncService extends Component
 
         $payload = $this->buildPayload($contract);
 
-        // Modo de prueba local: evita llamadas externas a ERSE (útil cuando no hay DNS/egreso).
-        if (Yii::$app->params['erse']['mock'] ?? false) {
-            $sync->sync_status = ErseContractSync::STATUS_SUCCESS;
-            $sync->erse_id = 'ERSE-MOCK-' . $contract->id;
-            $sync->erse_response = Json::encode([
-                'mock' => true,
-                'erse_id' => $sync->erse_id,
-                'status' => 'registered',
-                'requestPayload' => $payload,
-            ]);
-            $sync->updated_at = date('Y-m-d H:i:s');
-            $sync->save(false);
-
-            return [
-                'httpStatus' => 201,
-                'body' => [
-                    'erse_id' => $sync->erse_id,
-                    'status' => 'registered',
-                    'sync_id' => $sync->id,
-                ],
-            ];
-        }
-
-        $token = Yii::$app->params['erse']['bearerToken'] ?? '';
-        if ($token === '') {
-            $this->markFailed($sync, ['error' => 'configuration', 'message' => 'Falta ERSE_BEARER_TOKEN en configuración.']);
-            return [
-                'httpStatus' => 500,
-                'body' => ['error' => 'configuration', 'message' => 'Token ERSE no configurado.'],
-            ];
-        }
-
-        $baseUrl = Yii::$app->params['erse']['baseUrl'] ?? 'https://api.erse.pt/v2';
-
-        $http = new Client([
-            'baseUrl' => rtrim($baseUrl, '/'),
-            'requestConfig' => [
-                'options' => [
-                    CURLOPT_CONNECTTIMEOUT => 5,
-                    CURLOPT_TIMEOUT => 20,
-                ],
-            ],
-        ]);
-
         try {
-            $response = $http->createRequest()
-                ->setMethod('POST')
-                ->setUrl('/contracts')
-                ->setFormat(Client::FORMAT_JSON)
-                ->setData($payload)
-                ->addHeaders([
-                    'Authorization' => 'Bearer ' . $token,
-                    'Accept' => 'application/json',
-                ])
-                ->send();
+            $sendResult = $this->senderFactory->create()->send('/contracts', $payload);
         } catch (\Throwable $e) {
             $this->markFailed($sync, ['exception' => $e->getMessage()]);
+            $isConfigError = str_contains(strtolower($e->getMessage()), 'token erse no configurado');
             return [
-                'httpStatus' => 502,
+                'httpStatus' => $isConfigError ? 500 : 502,
                 'body' => [
-                    'error' => 'upstream_unreachable',
-                    'message' => 'No se pudo contactar con ERSE.',
+                    'error' => $isConfigError ? 'configuration' : 'upstream_unreachable',
+                    'message' => $isConfigError ? 'Token ERSE no configurado.' : 'No se pudo contactar con ERSE.',
                 ],
             ];
         }
 
-        $status = $response->statusCode;
-        $raw = $response->content;
-        $parsed = $this->tryDecodeJson($raw);
+        $status = (int) $sendResult['statusCode'];
+        $raw = (string) $sendResult['rawBody'];
+        $parsed = $sendResult['parsedBody'];
 
         $sync->erse_response = is_array($parsed) ? Json::encode($parsed) : (string) $raw;
         $sync->updated_at = date('Y-m-d H:i:s');
 
         if ($status === 201) {
             $sync->sync_status = ErseContractSync::STATUS_SUCCESS;
-            $sync->erse_id = $parsed['erse_id'] ?? null;
+            $sync->erse_id = $parsed['erse_id'] ?? ('ERSE-LOCAL-' . $contract->id);
             $sync->save(false);
             return [
                 'httpStatus' => 201,
@@ -224,13 +178,4 @@ class ErseSyncService extends Component
         $sync->save(false);
     }
 
-    private function tryDecodeJson(string $raw): ?array
-    {
-        try {
-            $data = Json::decode($raw);
-            return is_array($data) ? $data : null;
-        } catch (\Throwable) {
-            return null;
-        }
-    }
 }

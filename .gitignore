@@ -1,6 +1,6 @@
-# Documentación explicativa de la entrega (no subir al repo)
-docs/*.md
-part1-sql/EXPLICACIONES_PARTE1.md
+# No incluir markdowns en commits
+*.md
+**/*.md
 
 # Archivo unificado generado para maquetación
 ENTREGA_UNIFICADA.txt

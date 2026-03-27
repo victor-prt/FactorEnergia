@@ -18,7 +18,8 @@ INNER JOIN dbo.clients AS cl ON cl.id = c.client_id
 INNER JOIN dbo.tariffs AS t ON t.id = c.tariff_id
 LEFT JOIN dbo.meter_readings AS mr
     ON mr.contract_id = c.id
-   AND YEAR(mr.reading_date) = YEAR(GETDATE())
+   AND mr.reading_date >= DATEFROMPARTS(YEAR(GETDATE()), 1, 1)
+   AND mr.reading_date < DATEFROMPARTS(YEAR(GETDATE()) + 1, 1, 1)
 WHERE c.status = N'active'
 GROUP BY
     c.id,

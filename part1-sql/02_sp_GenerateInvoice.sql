@@ -37,12 +37,21 @@ BEGIN
             ;THROW 50003, N'Ya existe una factura para este contrato y periodo.', 1;
         END;
 
+        -- Validación explícita del formato YYYY-MM y conversión a primer día de mes.
+        DECLARE @period_start DATE = TRY_CONVERT(DATE, @billing_period + N'-01');
+        IF @period_start IS NULL OR LEN(@billing_period) <> 7 OR SUBSTRING(@billing_period, 5, 1) <> N'-'
+        BEGIN
+            ;THROW 50005, N'Formato de periodo inválido. Debe ser YYYY-MM.', 1;
+        END;
+
+        DECLARE @period_end DATE = DATEADD(MONTH, 1, @period_start);
         DECLARE @total_kwh DECIMAL(12, 3);
 
         SELECT @total_kwh = ISNULL(SUM(mr.kwh_consumed), 0)
         FROM dbo.meter_readings AS mr
         WHERE mr.contract_id = @contract_id
-          AND FORMAT(mr.reading_date, N'yyyy-MM') = @billing_period;
+          AND mr.reading_date >= @period_start
+          AND mr.reading_date < @period_end;
 
         IF @total_kwh = 0
         BEGIN

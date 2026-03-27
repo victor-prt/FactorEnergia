@@ -56,6 +56,20 @@ $config = [
         'spotPriceClient' => [
             'class' => app\components\FileGetContentsSpotPriceClient::class,
         ],
+        'erseHttpSender' => [
+            'class' => app\components\erse\ErseHttpSender::class,
+            'baseUrl' => $params['erse']['baseUrl'] ?? 'https://api.erse.pt/v2',
+            'bearerToken' => $params['erse']['bearerToken'] ?? '',
+        ],
+        'erseMockSender' => [
+            'class' => app\components\erse\ErseMockSender::class,
+        ],
+        'erseSenderFactory' => [
+            'class' => app\components\erse\ErseSenderFactory::class,
+            'mock' => (bool) ($params['erse']['mock'] ?? false),
+            'httpSender' => 'erseHttpSender',
+            'mockSender' => 'erseMockSender',
+        ],
         'invoiceCalculator' => [
             'class' => app\services\InvoiceCalculatorService::class,
             'db' => 'db',
@@ -64,6 +78,7 @@ $config = [
         'erseSync' => [
             'class' => app\services\ErseSyncService::class,
             'db' => 'db',
+            'senderFactory' => 'erseSenderFactory',
         ],
     ],
     'params' => $params,

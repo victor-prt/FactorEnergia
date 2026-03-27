@@ -91,7 +91,12 @@ class InvoiceCalculatorService extends Component
         $taxRate = $country === 'PT' ? 0.23 : 0.21;
         $total = $preTax + ($preTax * $taxRate);
 
-        $tx = $this->db->beginTransaction(Transaction::READ_COMMITTED);
+        try {
+            $tx = $this->db->beginTransaction(Transaction::READ_COMMITTED);
+        } catch (\Throwable) {
+            // Fallback para drivers que no soportan READ_COMMITTED (p. ej. SQLite en tests).
+            $tx = $this->db->beginTransaction();
+        }
         try {
             $invoice = new Invoice();
             $invoice->contract_id = $contractId;

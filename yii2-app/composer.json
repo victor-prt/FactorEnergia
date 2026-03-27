@@ -10,7 +10,8 @@
         "yiisoft/yii2-httpclient": "~2.0.15"
     },
     "require-dev": {
-        "yiisoft/yii2-debug": "~2.1.0"
+        "yiisoft/yii2-debug": "~2.1.0",
+        "phpunit/phpunit": "^10.5"
     },
     "config": {
         "allow-plugins": {
@@ -27,6 +28,11 @@
     "autoload": {
         "psr-4": {
             "app\\": ""
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "tests\\": "tests/"
         }
     }
 }
